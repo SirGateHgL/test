@@ -1,39 +1,192 @@
-world = "wpfnf"
-Webhook_Link = "https://discord.com/api/webhooks/1147289620078399629/zLxbn-gZ21cW-ooU3xbZ9tWJ9IgWqbVIJtrDNqZoVRfAiTUeWw_d189le_mouZtz67rm"
-bot = getBot()
-trashlist = {2,3,4,5,10,11,14,15,5028}
+-- Changeable Variables --
+worldList = {
+    "world1",
+    "world2",
+    "world3",
+    "world4",
+    "world5",
+    "world6"
+}
 
-function webhookListener(message)
-local wh = Webhook.new(Webhook_Link)
-wh.username = "Auto Clear SC"
-wh.avatar_url = ""
-wh.embed1.use = true
-wh.embed1.title = "Clearing Started."
-wh.embed1.description = message
-wh.embed1.color = 15105570
-wh:send()
-end 
+trash = {
+    5,
+    11,
+    14,
+    2914,
+    5024,
+    5026,
+    5028,
+    5030,
+    5032,
+    5034,
+    5036,
+    5038,
+    5040,
+    5042,
+    5044,
+}
 
-webhookListener("The Bot Started, The Bot Is Clearing the World: " .. world)
- 
+-- Join World --
+function join(world)
+    while getBot().world ~= string.upper(world) do
+        sendPacket(3, "action|join_request\nname|" .. string.upper(world))
+        sleep(3000)
+    end
+end
 
+-- Reconnect --
+function reconnect(world,x,y)
+    if getBot().status ~= "online" then
+        while getBot().status ~= "online" do
+            connect()
+            sleep(10000)
+        end
+        join(world)
+        sleep(100)
+        findPath(x,y)
+        sleep(100)
+    end
+end
+
+-- Clearing Trash --
 function clear()
-for i,tile in pairs(getBot():getWorld():getTiles()) do
-     if tile.bg ~= 0 and tile.fg ~= 8 and tile.fg ~= 3760 then
-         getBot():findPath(tile.x,tile.y-1)
-     end
-    while getTile(tile.x,tile.y).bg ~= 0 do
-         getBot():hit(tile.x,tile.y)
-         sleep(math.random(120,150))
-   end
-end
+    for _,i in ipairs(trash) do
+        if findItem(i) > 0 then 
+            local tresh = findItem(i)
+            sendPacket(2, "action|trash\n|itemID|".. i)
+            sendPacket(2, "action|dialog_return\ndialog_name|trash_item\nitemID|" .. i .. "|\ncount|" .. tresh) 
+            sleep(1000)
+            tresh = nil
+        end
+    end
 end
 
-while getBot().status == 1 do
-world = string.upper(world)
-  if getBot():isInWorld(world) == true then
+-- Bot Index --
+jmlBot = #getBots()
+for i = 0, jmlBot do
+    if string.upper(getBots()[i].name) == string.upper(getBot().name) then
+        indexBot = i
+    end
+end
+
+-- Plant and Harvest --
+function plantHv(world)
+    while findItem(2) == 0 do
+		for x = 30, 70 do
+			if findItem(2) == 200 then 
+                break
+            end
+            findPath(x, 23)
+            sleep(100)
+            while getTile(x, 23).ready do
+                punch(0, 0)
+                sleep(100)
+                reconnect(world,x,23)
+            end
+            collect(2)
+            while getTile(x, 23).fg == 0 and findItem(3) > 0 do
+                place(3, 0, 0)
+                sleep(200)
+                reconnect(world,x,23)
+            end
+		end
+        reconnect(world,30,23)
+    end
+end
+
+-- Break --
+function breakDirt(world)
+    for _, tile in pairs(getTiles()) do
+        if tile.bg > 0 and tile.fg ~= 8 then
+            if tile.x == 0 then
+                findPath(tile.x, tile.y - 1)
+                sleep(100)
+                while getTile(math.floor(getBot().x / 32), math.floor(getBot().y / 32) + 1).bg > 0 do
+                    punch(0,1)
+                    sleep(100)
+                    reconnect(world, tile.x, tile.y - 1)
+                end
+                collect(2)
+            end
+        end
+    end
+    for _, tile in pairs(getTiles()) do
+        if tile.bg > 0 and tile.fg ~= 8 then
+            if tile.y % 2 == 1 then
+                findPath(tile.x - 1, tile.y)
+                sleep(100)
+                while getTile(math.floor(getBot().x / 32) + 1, math.floor(getBot().y / 32)).bg > 0 do
+                    punch(1,0)
+                    sleep(100)
+                    reconnect(world, tile.x - 1, tile.y)
+                end
+                collect(2)
+            end
+            for i = 3, 15, 12 do
+                for x = 49, 51 do
+                    if findItem(i) > 100 and getTile(x,23).fg ~= 6 and getTile(x + 1,23).fg ~= 6 then
+                        findPath(x, 23)
+                        sleep(100)
+                        sendPacket(2,"action|drop\n|itemID|" .. i)
+                        sendPacket(2,"action|dialog_return\ndialog_name|drop_item\nitemID|" .. i .. "|\ncount|" .. findItem(i))
+                        sleep(200)
+                    end
+                end
+            end
+        end
+    end
+    plantHv()
+    sleep(100)
+    for _, tile in pairs(getTiles()) do
+        if tile.bg ~= 0 and tile.fg ~= 8 and ((tile.x + 1) % (jmlBot + 1)) == indexBot then
+            if tile.fg == 4 or tile.fg == 10 then
+                findPath(tile.x, tile.y - 1)
+                sleep(100)
+                while getTile(math.floor(getBot().x / 32), math.floor(getBot().y / 32) + 1).fg > 0 do
+                    punch(0,1)
+                    sleep(100)
+                    reconnect(world, tile.x, tile.y - 1)
+                end
+                collect(2)
+                while getTile(math.floor(getBot().x / 32), math.floor(getBot().y / 32) + 1).fg == 0 and findItem(2) > 0 do
+                    place(2,0,1)
+                    sleep(100)
+                    reconnect(world, tile.x, tile.y - 1)
+                end
+            end
+        end
+    end
     clear()
-  else
-    getBot():warp(world)
-  end
+    sleep(100)
+end
+
+-- Place --
+function placeDirt()
+    for y = 2, 52, 2 do
+        for x = 1, 99 do
+            if ((y + 1) % (jmlBot + 1)) == indexBot then
+                if getTile(x, y).fg == 0 then
+                    plantHv()
+                    sleep(100)
+                    findPath(x, y + 1)
+                    sleep(100)
+                    while getTile(x, y).fg == 0 do
+                        place(2, 0, -1)
+                        sleep(100)
+                        reconnect(world, x, y + 1)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Main --
+for _,list in pairs(worldList) do
+    join(list)
+    sleep(100)
+    breakDirt()
+    sleep(100)
+    placeDirt()
+    sleep(100)
 end
